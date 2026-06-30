@@ -1,0 +1,105 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: db-migration-sql
+  labels:
+    app: docchat
+data:
+  neon_setup.sql: |
+    -- ============================================================
+    -- DocChat — PostgreSQL Setup Script
+    -- Run this in: Console → SQL Editor
+    -- ============================================================
+
+    -- ────────────────────────────────────────────────────────────
+    -- STEP 1: DROP EXISTING (clean slate)
+    -- ────────────────────────────────────────────────────────────
+    DROP TABLE IF EXISTS chat_messages CASCADE;
+    DROP TABLE IF EXISTS chat_sessions  CASCADE;
+    DROP TABLE IF EXISTS users          CASCADE;
+
+    -- ────────────────────────────────────────────────────────────
+    -- STEP 2: CREATE TABLES
+    -- ────────────────────────────────────────────────────────────
+
+    -- Users table (replaces Supabase GoTrue auth)
+    CREATE TABLE users (
+        id            UUID        DEFAULT gen_random_uuid() PRIMARY KEY,
+        email         TEXT        NOT NULL UNIQUE,
+        password_hash TEXT        NOT NULL,
+        full_name     TEXT        NOT NULL DEFAULT '',
+        role          TEXT        NOT NULL DEFAULT 'user',
+        created_at    TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    -- Chat sessions
+    CREATE TABLE chat_sessions (
+        id         UUID        DEFAULT gen_random_uuid() PRIMARY KEY,
+        user_id    TEXT        NOT NULL,
+        title      TEXT        NOT NULL DEFAULT 'New Chat',
+        created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    -- Chat messages
+    CREATE TABLE chat_messages (
+        id         UUID        DEFAULT gen_random_uuid() PRIMARY KEY,
+        session_id UUID        NOT NULL REFERENCES chat_sessions(id) ON DELETE CASCADE,
+        role       TEXT        NOT NULL CHECK (role IN ('user', 'assistant')),
+        content    TEXT        NOT NULL DEFAULT '',
+        metadata   JSONB       NOT NULL DEFAULT '{}',
+        feedback   TEXT        CHECK (feedback IN ('up', 'down')),
+        created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    -- User documents tracking
+    CREATE TABLE user_documents (
+        id            UUID        DEFAULT gen_random_uuid() PRIMARY KEY,
+        user_id       TEXT        NOT NULL,
+        filename      TEXT        NOT NULL,
+        file_size     BIGINT      NOT NULL,
+        file_type     TEXT        NOT NULL,
+        chunks_count  INT         NOT NULL DEFAULT 0,
+        file_content  BYTEA,
+        created_at    TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(user_id, filename)
+    );
+
+    -- Password reset tokens
+    CREATE TABLE password_reset_tokens (
+        email      TEXT        PRIMARY KEY,
+        token      TEXT        NOT NULL,
+        expires_at TIMESTAMP   NOT NULL
+    );
+
+    -- Document view tokens
+    CREATE TABLE document_view_tokens (
+        token      TEXT        PRIMARY KEY,
+        doc_id     UUID        NOT NULL REFERENCES user_documents(id) ON DELETE CASCADE,
+        user_id    TEXT        NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+
+    -- ────────────────────────────────────────────────────────────
+    -- STEP 3: INDEXES
+    -- ────────────────────────────────────────────────────────────
+    CREATE INDEX idx_users_email            ON users(email);
+    CREATE INDEX idx_chat_sessions_user_id  ON chat_sessions(user_id);
+    CREATE INDEX idx_chat_messages_session  ON chat_messages(session_id);
+    CREATE INDEX idx_chat_messages_created  ON chat_messages(created_at);
+    CREATE INDEX idx_user_documents_user_id ON user_documents(user_id);
+    CREATE INDEX idx_document_view_doc_id   ON document_view_tokens(doc_id);
+
+    -- ────────────────────────────────────────────────────────────
+    -- STEP 4: SEED DEMO USER
+    -- ────────────────────────────────────────────────────────────
+    INSERT INTO users (email, password_hash, full_name, role) 
+    VALUES ('demo@shashipal.in', '$2b$12$oUmmm/ue7ug2IIe5WiidXec7Z6QQfkUSv3PQCWIGeQ75gHdvbXy1W', 'Demo User', 'user')
+    ON CONFLICT (email) DO NOTHING;
+
+
+    -- ────────────────────────────────────────────────────────────
+    -- STEP 4: VERIFY
+    -- ────────────────────────────────────────────────────────────
+    SELECT table_name FROM information_schema.tables
+    WHERE table_schema = 'public'
+    ORDER BY table_name;

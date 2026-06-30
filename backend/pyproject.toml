@@ -1,0 +1,68 @@
+[project]
+name = "docchat-backend"
+version = "1.0.0"
+description = "Production RAG API with multi-provider LLM support"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi[standard]>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "python-multipart>=0.0.22",
+    "pydantic>=2.12.5",
+    "pydantic-settings>=2.8.0",
+    "python-dotenv>=1.2.1",
+    "google-genai>=1.64.0",
+    "openai>=1.64.0",
+    "groq>=0.14.0",
+    "qdrant-client>=1.10.0",
+    "pypdf>=4.0.0",
+    "python-docx>=1.2.0",
+    "python-jose[cryptography]>=3.5.0",
+    "httpx>=0.28.1",
+    "langsmith>=0.7.5",
+    "langchain>=1.2.10",
+    "duckduckgo-search>=8.1.1",
+    "google-api-core>=2.30.0",
+    "asyncpg>=0.30.0",
+    "passlib[bcrypt]>=1.7.4",
+    "bcrypt>=4.0.0",
+    "Pillow>=11.2.1",
+    "langchain-text-splitters>=1.1.2",
+    "opendataloader-pdf>=2.3.0",
+    "resend>=2.29.0",
+    "nltk>=3.8.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=9.0.2",
+    "ruff>=0.9.1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[tool.hatch.build]
+include = ["app/**"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+exclude = ["notebook", ".venv", ".git", "__pycache__", "build", "dist"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "C4"]
+ignore = [
+    "E501", # Line too long (handled by formatter)
+    "B008", # Do not perform function call in argument defaults (standard in FastAPI)
+]
+fixable = ["ALL"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"

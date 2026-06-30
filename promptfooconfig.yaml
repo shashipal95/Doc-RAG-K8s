@@ -1,0 +1,35 @@
+# yaml-language-server: $schema=https://promptfoo.dev/config-schema.json
+
+description: "Doc-RAG LLM Evaluation"
+
+prompts:
+  - file://prompts/system_prompt.txt
+  - file://prompts/user_prompt.txt
+
+providers:
+  - id: google:gemini-1.5-flash
+    config:
+      temperature: 0.7
+  - id: groq:llama-3.3-70b-versatile
+    config:
+      temperature: 0.7
+  - id: openai:gpt-4o-mini
+    config:
+      temperature: 0.7
+
+tests:
+  - vars:
+      query: "What is the capital of France?"
+    assert:
+      - type: icontains
+        value: Paris
+  - vars:
+      query: "Explain quantum entanglement in one sentence."
+    assert:
+      - type: llm-rubric
+        value: The explanation should be accurate and limited to one sentence.
+  - vars:
+      query: "Write a short poem about coding."
+    assert:
+      - type: contains-json
+        value: false # Ensure it's not JSON

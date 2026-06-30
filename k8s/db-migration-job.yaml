@@ -1,0 +1,42 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-migration
+  labels:
+    app: docchat
+spec:
+  backoffLimit: 3          # retry up to 3 times on failure
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: psql-migrator
+          image: postgres:15-alpine       # tiny client that ships with psql
+          env:
+            # Pull the same DATABASE_URL that the backend uses
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: rag-secret
+                  key: DATABASE_URL
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              # Wait for the DB to be reachable (max 30 s)
+              for i in $(seq 1 30); do
+                pg_isready -h docchat-db -p 5432 && break
+                echo "Waiting for DB… ($i/30)"
+                sleep 1
+              done
+              # Run the script
+              psql "$DATABASE_URL" -f /sql/neon_setup.sql
+          volumeMounts:
+            - name: sql
+              mountPath: /sql
+      volumes:
+        - name: sql
+          configMap:
+            name: db-migration-sql
+            items:
+              - key: neon_setup.sql
+                path: neon_setup.sql

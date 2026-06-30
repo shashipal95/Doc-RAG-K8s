@@ -1,0 +1,51 @@
+# Core FastAPI
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
+python-multipart==0.0.22
+
+# Data Validation
+pydantic==2.12.5
+pydantic-settings==2.8.0
+
+# Environment Management
+python-dotenv==1.2.1
+
+# AI/ML
+google-genai==1.64.0
+google-api-core==2.19.0  # Added to satisfy import in app/services/llm.py
+openai==1.64.0
+groq==0.14.0
+cohere==5.1.8
+
+# Vector Database
+qdrant-client==1.10.0
+
+# Document Processing
+pypdf==4.3.1
+python-docx==1.2.0
+Pillow==11.2.1
+nltk==3.8.1
+
+# Authentication & Database
+python-jose[cryptography]==3.5.0
+passlib[bcrypt]==1.7.4
+asyncpg==0.30.0
+httpx==0.28.1
+
+# Image search (no API key required)
+duckduckgo-search==6.3.7
+
+# LangSmith (Tracing)
+langsmith==0.7.5
+langchain==1.2.10
+langchain-text-splitters==1.1.2
+
+# MLflow (Experiment Tracking & Monitoring)
+mlflow==2.22.0
+
+# Dev / Testing
+pytest==9.0.2
+ruff==0.9.1
+
+# Metrics / Monitoring
+prometheus-client==0.20.0

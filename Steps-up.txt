@@ -1,0 +1,43 @@
+## How to Run Doc‑RAG
+
+### Using Docker‑Compose (local development)
+1. Build and start all services (including Nginx):
+   ```
+   docker compose up --build -d
+   ```
+2. Verify that the stack is up:
+   ```
+   docker compose ps
+   ```
+3. Open the application in your browser:
+   - Frontend UI: http://localhost
+   - Health check: http://localhost/health
+4. To stop and remove containers:
+   ```
+   docker compose down
+   ```
+
+### Using Kubernetes (production‑like environment)
+1. Ensure you have a Kubernetes cluster & `kubectl` configured.
+2. Apply all manifests (including Nginx, ConfigMap, Deployments, Services):
+   ```
+   kubectl apply -f k8s/
+   ```
+3. Verify resources:
+   ```
+   kubectl get pods,svc,deploy
+   ```
+4. Expose Nginx (example with port‑forward):
+   ```
+   kubectl port-forward svc/nginx 80:80
+   ```
+   Then open http://localhost in your browser.
+5. To clean up:
+   ```
+   kubectl delete -f k8s/
+   ```
+
+### Notes
+- The frontend container expects the backend API at `http://localhost` (thanks to Nginx proxy).
+- Health endpoint `/health` is proxied to the backend without authentication.
+- Adjust any environment variables in `.env` or `configmap-secrets.yaml` as needed before deployment.

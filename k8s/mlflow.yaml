@@ -1,0 +1,99 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: docchat-mlflow-pvc
+  labels:
+    app: docchat-mlflow
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: docchat-mlflow
+  labels:
+    app: docchat-mlflow
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: docchat-mlflow
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: docchat-mlflow
+    spec:
+      containers:
+        - name: mlflow
+          image: ghcr.io/mlflow/mlflow:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5000
+              name: http
+          command:
+            - mlflow
+            - server
+            - --host
+            - 0.0.0.0
+            - --port
+            - "5000"
+            - --backend-store-uri
+            - sqlite:///mlflow/mlflow.db
+            - --default-artifact-root
+            - /mlflow/artifacts
+            - --static-prefix
+            - /mlflow
+            - --allowed-hosts
+            - "*"
+            - --workers
+            - "1"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              cpu: 500m
+              memory: 1.5Gi
+          livenessProbe:
+            httpGet:
+              path: /mlflow/health
+              port: 5000
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 15
+            failureThreshold: 6
+          readinessProbe:
+            httpGet:
+              path: /mlflow/health
+              port: 5000
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 15
+            failureThreshold: 6
+          volumeMounts:
+            - name: mlflow-storage
+              mountPath: /mlflow
+      volumes:
+        - name: mlflow-storage
+          persistentVolumeClaim:
+            claimName: docchat-mlflow-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: docchat-mlflow
+  labels:
+    app: docchat-mlflow
+spec:
+  ports:
+    - port: 5000
+      targetPort: 5000
+  selector:
+    app: docchat-mlflow
+  type: ClusterIP

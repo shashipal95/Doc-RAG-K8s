@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: docchat-config
+  labels:
+    app: docchat
+data:
+  # Connection URLs using K8s service dns names
+  QDRANT_URL: "http://docchat-qdrant:6333"
+  QDRANT_COLLECTION_NAME: "doc-rag"
+  LANGCHAIN_TRACING_V2: "false"
+  OLLAMA_BASE_URL: "http://ollama-service:11434"
+  NEXT_PUBLIC_API_URL: "http://localhost"
+  MLFLOW_TRACKING_URI: "http://docchat-mlflow:5000/mlflow"

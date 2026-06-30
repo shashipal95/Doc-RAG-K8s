@@ -1,0 +1,245 @@
+================================================================================
+KUBERNETES RUNNING, DEBUGGING, & TROUBLESHOOTING GUIDE FOR DOCCHAT RAG SYSTEM
+================================================================================
+
+This guide contains all Kubernetes (k8s) commands required to deploy, manage, 
+debug, troubleshoot, and monitor the DocChat RAG system. Commands are structured 
+from beginner setup to advanced industry-standard operations.
+
+--------------------------------------------------------------------------------
+TABLE OF CONTENTS
+--------------------------------------------------------------------------------
+1. Prerequisites & Cluster Setup
+2. Deploying the Application
+3. Basic Operations (Get, Describe, & Logs)
+4. Interactive Debugging (Exec, Port-Forward, & Probes)
+5. Troubleshooting Database & Volume Issues (PV / PVC / Storage)
+6. Troubleshooting Deployments & Rollbacks (Rollout, Scale, & Patch)
+7. Advanced Debugging & Diagnostics (Events, Ephemeral Containers, & Top)
+8. Pod & Cluster Monitoring (Metrics Server, Prometheus, Grafana, & Dashboard)
+
+================================================================================
+1. PREREQUISITES & CLUSTER SETUP
+================================================================================
+Before running the manifests, verify your kubectl environment and cluster access.
+
+# Check kubectl version
+kubectl version --client
+
+# List all available contexts (clusters you can connect to)
+kubectl config get-contexts
+
+# View the current active context
+kubectl config current-context
+
+# Switch context to a specific cluster (e.g., Minikube or Docker Desktop)
+kubectl config use-context minikube
+kubectl config use-context docker-desktop
+
+# Check cluster info and status
+kubectl cluster-info
+
+# Check status of cluster nodes
+kubectl get nodes
+kubectl get nodes -o wide
+
+================================================================================
+2. DEPLOYING THE APPLICATION
+================================================================================
+Deploy the resources in their logical dependency order: Configs -> DBs -> Apps.
+
+# Dry-run validation (checks syntax without applying)
+kubectl apply --dry-run=client -f k8s/
+
+# 1. Create the ConfigMap and Secrets
+kubectl apply -f k8s/configmap-secrets.yaml
+
+# 2. Start Qdrant and PostgreSQL (databases require storage binding)
+kubectl apply -f k8s/postgres.yaml
+kubectl apply -f k8s/qdrant.yaml
+
+# 3. Start the Backend API and Stateless Frontend
+kubectl apply -f k8s/backend.yaml
+kubectl apply -f k8s/frontend.yaml
+
+# Apply all manifests in the directory at once
+kubectl apply -f k8s/
+
+================================================================================
+3. BASIC OPERATIONS (GET, DESCRIBE, & LOGS)
+================================================================================
+These are the daily commands to view the state and logs of your applications.
+
+# List all resources (Pods, Services, Deployments, PVCs)
+kubectl get all
+kubectl get pods,pvc,svc,deploy
+
+# List resources with labels and status
+kubectl get pods --show-labels
+kubectl get pods -l app=docchat-backend
+
+# Get resource info in YAML or JSON format
+kubectl get deployment docchat-backend -o yaml
+kubectl get pod <pod-name> -o json
+
+# Describe resources (critical for checking failures, events, and port mappings)
+kubectl describe pod <pod-name>
+kubectl describe service docchat-backend
+kubectl describe pvc docchat-db-pvc
+
+# Stream/View Logs of a specific pod
+kubectl logs <pod-name>
+kubectl logs -f <pod-name>                     # Follow/tail logs in real-time
+
+# Advanced Logging Options
+kubectl logs --tail=100 <pod-name>             # View last 100 lines
+kubectl logs --since=1h <pod-name>             # View logs from past 1 hour
+kubectl logs -f <pod-name> --timestamps        # Include timestamps in output
+
+# View logs of a Deployment (merges logs of all replicas)
+kubectl logs deployment/docchat-backend --all-containers=true -f
+
+# View logs of the previous instance of a crashed pod (essential for OOMKilled/CrashLoopBackOff)
+kubectl logs <pod-name> --previous
+
+================================================================================
+4. INTERACTIVE DEBUGGING (EXEC, PORT-FORWARD, & PROBES)
+================================================================================
+How to connect directly to running containers and test connectivity.
+
+# Exec into a running pod and open an interactive bash shell
+kubectl exec -it <pod-name> -- /bin/bash
+kubectl exec -it <pod-name> -- /bin/sh         # For alpine-based images like postgres
+
+# Run a one-off database check command directly on the Postgres pod
+kubectl exec -it deployment/docchat-db -- pg_isready -U postgres
+
+# Check database tables inside postgres container
+kubectl exec -it deployment/docchat-db -- psql -U postgres -d docchat -c "\dt"
+
+# Port-Forward to access services locally without external ingress mapping
+# Syntax: kubectl port-forward <resource> <local-port>:<container-port>
+kubectl port-forward deployment/docchat-backend 8000:8000
+kubectl port-forward deployment/docchat-qdrant 6333:6333
+kubectl port-forward service/docchat-frontend 3000:3000
+
+# Test network resolution inside the frontend pod (verifies it can resolve the backend)
+kubectl exec -it <frontend-pod-name> -- nslookup docchat-backend
+kubectl exec -it <frontend-pod-name> -- curl http://docchat-backend:8000/api/v1/health
+
+================================================================================
+5. TROUBLESHOOTING DATABASE & VOLUME ISSUES (PV / PVC / STORAGE)
+================================================================================
+When DB pods are stuck in "Pending", it's usually a storage/volume issue.
+
+# Check Persistent Volume Claims (PVC) and their binding status
+kubectl get pvc
+kubectl get pvc -o wide
+
+# Check Persistent Volumes (PV)
+kubectl get pv
+
+# Describe PVC to see why it isn't binding (e.g., missing storageclass)
+kubectl describe pvc docchat-db-pvc
+
+# Check available StorageClasses in the cluster
+kubectl get storageclass (or short: kubectl get sc)
+
+# Temporarily delete a PVC (Warning: data is deleted if reclaim policy is Delete)
+kubectl delete pvc <pvc-name>
+
+================================================================================
+6. TROUBLESHOOTING DEPLOYMENTS & ROLLBACKS (ROLLOUT, SCALE, & PATCH)
+================================================================================
+Commands to manage container updates, rollbacks, scaling, and configuration patches.
+
+# Check the status of a deployment rollout
+kubectl rollout status deployment/docchat-backend
+
+# View revision history of deployments
+kubectl rollout history deployment/docchat-backend
+
+# Undo a failed rollout / rollback to previous version
+kubectl rollout undo deployment/docchat-backend
+kubectl rollout undo deployment/docchat-backend --to-revision=2
+
+# Restart a deployment (forces a rolling update / pulls new image tags like 'latest')
+kubectl rollout restart deployment/docchat-backend
+kubectl rollout restart deployment/docchat-frontend
+
+# Scale deployments horizontally up or down
+kubectl scale deployment/docchat-frontend --replicas=5
+kubectl scale deployment/docchat-backend --replicas=0   # Effectively stops the backend
+
+# Edit deployment configuration on-the-fly (opens in system default editor)
+kubectl edit deployment/docchat-backend
+
+# Update container image directly via command line
+kubectl set image deployment/docchat-backend backend=docchat-backend:v2.0.0
+
+================================================================================
+7. ADVANCED DEBUGGING & DIAGNOSTICS (EVENTS, EPHEMERAL CONTAINERS, & TOP)
+================================================================================
+Industry-level commands to diagnose deep runtime failures and resource issues.
+
+# List Cluster Events (events tell you why a pod failed to pull or schedule)
+kubectl get events --sort-by='.metadata.creationTimestamp'
+kubectl get events -w                         # Watch events in real-time
+
+# Filter events by Warn state (shows errors, node issues, probe failures)
+kubectl get events --field-selector type=Warning
+
+# Check Resource Usage of Nodes and Pods (requires metrics-server)
+kubectl top nodes
+kubectl top pods
+kubectl top pods --containers                 # Top metrics broken down by container
+
+# Ephemeral Debug Container (Advanced K8s Feature)
+# If a pod is crash-looping or has no terminal/shell utilities, run a debug container:
+kubectl debug -it <pod-name> --image=busybox --target=backend
+
+# Copy files to/from a pod (e.g., download logs, or upload local datasets)
+# Syntax: kubectl cp <local-path> <pod-name>:<container-path>
+kubectl cp <pod-name>:/app/uploads ./local_backup_uploads
+kubectl cp ./Dataset/data.txt <pod-name>:/app/uploads/data.txt
+
+# Delete stuck pod forcefully (grace-period = 0)
+kubectl delete pod <pod-name> --grace-period=0 --force
+
+================================================================================
+8. POD & CLUSTER MONITORING (METRICS, PROMETHEUS, GRAFANA)
+================================================================================
+Best practices for monitoring k8s workloads.
+
+# A. Kubernetes Dashboard Setup (If running local cluster)
+# Start dashboard service
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v2.7.0/aio/deploy/recommended.yaml
+# Access via proxy
+kubectl proxy
+# Then visit: http://localhost:8001/api/v1/namespaces/kubernetes-dashboard/services/https:kubernetes-dashboard:/proxy/
+
+# B. Checking Workload Health Probes (Liveness/Readiness status)
+# Check the Events in `kubectl describe pod <pod-name>`. 
+# If probes fail, you will see warnings like:
+# "Readiness probe failed: HTTP probe failed with statuscode: 500"
+
+# C. Installing Prometheus & Grafana via Helm (Industry Standard)
+# 1. Add Helm repos
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo add grafana https://grafana.github.io/helm-charts
+helm repo update
+
+# 2. Install Prometheus Stack (includes node-exporter, kube-state-metrics)
+helm install prometheus prometheus-community/kube-prometheus-stack --namespace monitoring --create-namespace
+
+# 3. Access Grafana Dashboard
+# Port-forward Grafana service to port 3000 locally
+kubectl port-forward deployment/prometheus-grafana 3000:3000 --namespace monitoring
+# Get admin password:
+kubectl get secret --namespace monitoring prometheus-grafana -o jsonpath="{.data.admin-password}" | base64 --decode
+
+# D. Live Pod Multi-Log Monitoring (using Stern CLI)
+# Stern allows tailing multiple pod logs with regex patterns and color-coding:
+# Install: scoop install stern / brew install stern
+stern docchat-.* --tail 50
+================================================================================

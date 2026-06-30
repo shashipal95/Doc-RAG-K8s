@@ -1,0 +1,55 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: docchat-backend-scaler
+  namespace: default
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: docchat-backend
+  minReplicaCount: 1
+  maxReplicaCount: 4
+  triggers:
+    - type: cpu
+      metadata:
+        metricType: Utilization
+        value: "70" # 70% CPU threshold
+    - type: memory
+      metadata:
+        metricType: Utilization
+        value: "75" # 75% Memory threshold
+    - type: cron
+      metadata:
+        timezone: UTC
+        start: 0 9 * * *       # Scale up at 09:00 UTC
+        end: 0 17 * * *        # Scale back at 17:00 UTC
+        desiredReplicas: "3"
+    - type: prometheus
+      metadata:
+        serverAddress: http://monitoring-kube-prometheus-prometheus.default.svc.cluster.local:9090
+        metricName: http_requests_rate
+        query: sum(rate(http_requests_total{job="docchat-backend"}[2m]))
+        threshold: "10"
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: docchat-frontend-scaler
+  namespace: default
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: docchat-frontend
+  minReplicaCount: 2
+  maxReplicaCount: 5
+  triggers:
+    - type: cpu
+      metadata:
+        metricType: Utilization
+        value: "75" # 75% CPU threshold
+    - type: memory
+      metadata:
+        metricType: Utilization
+        value: "75" # 75% Memory threshold

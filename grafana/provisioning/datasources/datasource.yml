@@ -1,0 +1,9 @@
+apiVersion: 1
+
+datasources:
+  - name: Prometheus      # The name you'll see in Grafana
+    type: prometheus
+    access: proxy        # Access via the Grafana backend
+    url: http://prometheus:9090  # The internal URL
+    isDefault: true      # Make this the default datasource for new panels
+    editable: false      # Prevent users from changing it in the UI
